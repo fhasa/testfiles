@@ -1,0 +1,583 @@
+
+'''
+
+pip3 install paho-mqtt
+
+sudo pip3 install firebase_admin
+
+'''
+
+
+#=========mqtt lib
+import time
+import paho.mqtt.client as paho
+from paho import mqtt
+import threading
+#=========
+
+#=========firebase lib
+import json
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
+#=========
+
+interval_to_insert_inDB=1*9 #1*9 => 9 sec
+lastTime_insert_centric_inDB=0
+lastTime_insert_branch1_inDB=0
+lastTime_insert_branch2_inDB=0
+
+
+
+
+
+#------------------------firebase init
+# Fetch the service account key JSON file contents
+cred = credentials.Certificate('firebase_key.json')
+# Initialize the app with a service account, granting admin privileges
+firebase_admin.initialize_app(cred, {
+    'databaseURL': "https://iot-vertical-farming-40e8a-default-rtdb.firebaseio.com"
+})
+
+'''firebase_admin.delete_app(firebase_admin.get_app()) ''' ##to delete all project app
+#------------------------
+
+#================================
+
+#range
+min_air_temperature=0
+max_air_temperature=0
+min_air_humidity=0
+max_air_humidity=0
+min_light_intensity=0
+max_light_intensity=0
+min_ph=0
+max_ph=0
+min_tds=0
+max_tds=0
+min_water_temperature=0
+max_water_temperature=0
+
+
+#centric
+ph=0
+tds=0
+water_temperature=0
+
+manual_big_pump1_water_flow="auto"
+manual_small_pump1_acid="auto"
+manual_small_pump2_base="auto"
+manual_small_pump3_nutrient="auto"
+
+
+#branch1
+branch1_air_temperature=0
+branch1_air_humidity=0
+branch1_light_intensity=0
+
+branch1_manual_light="auto"
+
+
+#branch2
+branch2_air_temperature=0
+branch2_air_humidity=0
+branch2_light_intensity=0
+
+branch2_manual_light="auto"
+
+
+
+def update_sensor_value_range():
+  global min_air_humidity
+  global max_air_humidity
+  global min_light_intensity
+  global max_light_intensity
+  global min_ph
+  global max_ph
+  global min_tds
+  global max_tds
+  global min_water_temperature
+  global max_water_temperature
+  
+  ref_current_plant_name_id = db.reference("setting/current_plant_name_id")
+  current_plant_name_id=ref_current_plant_name_id.get()
+  ref_sensor_range = db.reference("setting/plant_properties/"+current_plant_name_id)
+  plant_sensor_range=ref_sensor_range.get()
+  
+  print(plant_sensor_range)
+  
+  for x in dict(plant_sensor_range):
+    #print(x)
+    if x=="air_temperature":
+      min_air_temperature=plant_sensor_range[x].split("-")[0]
+      max_air_temperature=plant_sensor_range[x].split("-")[1]
+     
+    if x=="air_humidity":
+      min_air_humidity=plant_sensor_range[x].split("-")[0]
+      max_air_humidity=plant_sensor_range[x].split("-")[1]
+      
+    if x=="light_intensity":
+      min_light_intensity=plant_sensor_range[x].split("-")[0]
+      max_light_intensity=plant_sensor_range[x].split("-")[1]
+
+    if x=="ph":
+      min_ph=plant_sensor_range[x].split("-")[0]
+      max_ph=plant_sensor_range[x].split("-")[1]
+    
+    if x=="tds":
+      min_tds=plant_sensor_range[x].split("-")[0]
+      max_tds=plant_sensor_range[x].split("-")[1]
+      
+    if x=="water_temperature":
+      min_water_temperature=plant_sensor_range[x].split("-")[0]
+      max_water_temperature=plant_sensor_range[x].split("-")[1]
+   
+  print(min_air_temperature)   
+  print(max_air_temperature)   
+  print(min_air_humidity)   
+  print(max_air_humidity)   
+  print(min_light_intensity)   
+  print(max_light_intensity)
+  print(min_ph)
+  print(max_ph)
+  print(min_tds)
+  print(max_tds)
+  print(min_water_temperature)   
+  print(max_water_temperature)   
+      
+      
+update_sensor_value_range()
+#print("min_air_humidity="+str(min_air_humidity))
+
+#================================
+
+
+
+# setting callbacks for different events to see if it works, print the message etc.
+def on_connect(client, userdata, flags, rc, properties=None):
+    print("CONNACK received with code %s." % rc)
+    
+    if rc == 0:
+      print("Connected to MQTT Broker!")
+    else:
+      print("Failed to connect, return code %d\n", rc)
+      
+      
+# with this callback you can see if your publish was successful
+def on_publish(client, userdata, mid, properties=None):
+    print("publish OK => mid: " + str(mid))
+
+# print which topic was subscribed to
+def on_subscribe(client, userdata, mid, granted_qos, properties=None):
+    print("Subscribed Ok => mid: " + str(mid) + " " + str(granted_qos))
+
+# print message, useful for checking if it was successful
+def on_message(client, userdata, msg):
+    #print(msg.topic + " " + str(msg.qos) + " " + str(msg.payload))
+    
+    
+    try:
+      subscribe_function(msg.topic,msg.payload)
+    except:
+      print("Error in subscribe_function")
+      
+    
+
+# using MQTT version 5 here, for 3.1.1: MQTTv311, 3.1: MQTTv31
+client = paho.Client(client_id="client_name_id", userdata=None, protocol=paho.MQTTv31)
+client.on_connect = on_connect
+
+client.connect("mqtt-dashboard.com", 1883)
+client.on_subscribe = on_subscribe
+client.on_message = on_message
+client.on_publish = on_publish
+
+
+client.subscribe("iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump2_base", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/centric/sensor_value", qos=1)
+
+client.subscribe("iot_vertical_farming_ppu2022/branch1/manual_light", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/branch1/sensor_value", qos=1)
+
+client.subscribe("iot_vertical_farming_ppu2022/branch2/manual_light", qos=1)#on/off/auto
+client.subscribe("iot_vertical_farming_ppu2022/branch2/sensor_value", qos=1)
+
+client.subscribe("iot_vertical_farming_ppu2022/RPI/update_firebase_range_value", qos=1)#update range from firebase
+
+
+
+def subscribe_function(topic,msg):
+  global manual_big_pump1_water_flow
+  global manual_small_pump1_acid
+  global manual_small_pump2_base
+  global manual_small_pump3_nutrient
+  global branch1_manual_light
+  global branch2_manual_light
+  
+  str_topic=str(topic)
+
+  
+  print("str_topic=>"+str_topic)
+
+  
+  if(str_topic=="iot_vertical_farming_ppu2022/centric/sensor_value"):
+    centric_esp_function(json.loads(msg))
+    
+  elif(str_topic=="iot_vertical_farming_ppu2022/branch1/sensor_value"):
+    branch1_esp_function(json.loads(msg))
+   
+  elif(str_topic=="iot_vertical_farming_ppu2022/branch2/sensor_value"):
+    branch2_esp_function(json.loads(msg))
+    
+  if(str_topic=="iot_vertical_farming_ppu2022/RPI/update_firebase_range_value"):
+    update_sensor_value_range()
+    
+  #---------------------------  
+  elif(str_topic=="iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow"):
+    manual_big_pump1_water_flow=msg.decode('utf-8')
+  elif(str_topic=="iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid"):
+    manual_small_pump1_acid=msg.decode('utf-8')
+  elif(str_topic=="iot_vertical_farming_ppu2022/centric/manual_small_pump2_base"):
+    manual_small_pump2_base=msg.decode('utf-8')  
+  elif(str_topic=="iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient"):
+    manual_small_pump3_nutrient=msg.decode('utf-8')  
+  elif(str_topic=="iot_vertical_farming_ppu2022/branch1/manual_light"):
+    branch1_manual_light=msg.decode('utf-8')
+  elif(str_topic=="iot_vertical_farming_ppu2022/branch2/manual_light"):
+    branch2_manual_light=msg.decode('utf-8')  
+
+
+def centric_esp_function(msg):
+  global ph
+  global tds
+  global water_temperature
+  
+  sensor = msg
+  try:
+    ph=sensor['ph']
+  except:
+    ph="0"
+  try:  
+    tds=sensor['tds']
+  except:
+    tds="0"
+  try:    
+    water_temperature=sensor['water_temperature']
+  except:
+    water_temperature="0"
+  
+  
+  #do save history here every interval
+  global interval_to_insert_inDB
+  global lastTime_insert_centric_inDB
+  t = time.localtime()
+  current_datetime = time.strftime("%Y-%m-%d %H:%M:%S", t)
+  current_ts=time.time()
+  
+  if current_ts-lastTime_insert_centric_inDB > interval_to_insert_inDB: 
+    lastTime_insert_centric_inDB=current_ts
+    db.reference("sensor_value_history").child("centric").push({'ph':ph, "tds":tds,"water_temperature":water_temperature,"datetime":current_datetime})
+ 
+    
+def branch1_esp_function(msg):
+  global branch1_air_temperature
+  global branch1_air_humidity
+  global branch1_light_intensity
+
+  sensor = msg
+  try:
+    branch1_air_temperature=sensor['air_temperature']
+  except:
+    branch1_air_temperature="0"
+  try:  
+    branch1_air_humidity=sensor['air_humidity']
+  except:
+    branch1_air_humidity="0"
+  try:    
+    branch1_light_intensity=sensor['light_intensity']
+  except:
+    branch1_light_intensity="0"
+  
+  
+  #do save history here every interval
+  global interval_to_insert_inDB
+  global lastTime_insert_branch1_inDB
+  t = time.localtime()
+  current_datetime = time.strftime("%Y-%m-%d %H:%M:%S", t)
+  current_ts=time.time()
+  
+  if current_ts-lastTime_insert_branch1_inDB > interval_to_insert_inDB: 
+    lastTime_insert_branch1_inDB=current_ts
+    db.reference("sensor_value_history").child("branch1").push({'air_temperature':branch1_air_temperature, "air_humidity":branch1_air_humidity,"light_intensity":branch1_light_intensity,"datetime":current_datetime})
+ 
+    
+def branch2_esp_function(msg):
+  global branch2_air_temperature
+  global branch2_air_humidity
+  global branch2_light_intensity
+
+  sensor = msg
+
+  try:
+    branch2_air_temperature=sensor['air_temperature']
+    print("--->"+branch2_air_temperature)
+  except:
+    branch2_air_temperature="0"
+  try:  
+    branch2_air_humidity=sensor['air_humidity']
+  except:
+    branch2_air_humidity="0"
+  try:    
+    branch2_light_intensity=sensor['light_intensity']
+  except:
+    branch2_light_intensity="0"
+  
+  #do save history here every interval
+  global interval_to_insert_inDB
+  global lastTime_insert_branch2_inDB
+  t = time.localtime()
+  current_datetime = time.strftime("%Y-%m-%d %H:%M:%S", t)
+  current_ts=time.time()
+  
+  if current_ts-lastTime_insert_branch2_inDB > interval_to_insert_inDB: 
+    lastTime_insert_branch2_inDB=current_ts
+    db.reference("sensor_value_history").child("branch2").push({'air_temperature':branch2_air_temperature, "air_humidity":branch2_air_humidity,"light_intensity":branch2_light_intensity,"datetime":current_datetime})
+  
+  
+def publish_mqtt(topic,msg):
+  client.publish(topic, payload=msg, qos=1)
+  
+  
+  
+
+def to_num(num):
+  if num=="":
+    return 0
+  else:
+    return float(num)
+    
+    
+    
+  
+def run_processing():
+
+  #range for centric
+  global min_ph
+  global max_ph
+  global min_tds
+  global max_tds
+  global min_water_temperature
+  global max_water_temperature
+  #range for slaves
+  global min_air_temperature
+  global max_air_temperature
+  global min_air_humidity
+  global max_air_humidity
+  global min_light_intensity
+  global max_light_intensity
+
+  #----------------------------
+  #centric
+  global ph
+  global tds
+  global water_temperature
+  
+  global manual_big_pump1_water_flow
+  global manual_small_pump1_acid
+  global manual_small_pump2_base
+  global manual_small_pump3_nutrient
+
+  #branch1
+  global branch1_air_temperature
+  global branch1_air_humidity
+  global branch1_light_intensity
+  global branch1_manual_light
+  #branch2
+  global branch2_air_temperature
+  global branch2_air_humidity
+  global branch2_light_intensity
+  global branch2_manual_light
+
+  #------To publish
+  big_pump1_water_flow="off"
+  small_pump1_acid="off"
+  small_pump2_base="off"
+  small_pump3_nutrient="off"
+  
+  branch1_light="off"
+  branch1_alarm_air_temperature="off"
+  
+  branch2_light="off"
+  branch2_alarm_air_temperature="off"
+  #------
+  
+  
+  print("---------algorithm----------")
+  
+  i=0
+  
+    
+  
+  while 1:
+    i+=1
+    print("---------loop"+str(i)+"----------")
+    
+    #------default value to publish
+    big_pump1_water_flow="off"
+    small_pump1_acid="off"
+    small_pump2_base="off"
+    small_pump3_nutrient="off"
+    branch1_light="off"
+    branch2_light="off"
+    #----------------------------
+    
+    #================================================================centric
+    
+    #big_pump1_water_flow
+    print(manual_big_pump1_water_flow)
+    
+    if manual_big_pump1_water_flow=="on" :
+      big_pump1_water_flow="on"
+      
+    else:
+      big_pump1_water_flow="off"
+
+    
+    #small_pump1_acid
+    if manual_small_pump1_acid=="on":
+      small_pump1_acid="on"
+    elif manual_small_pump1_acid=="off":
+      small_pump1_acid="off"
+    elif manual_small_pump1_acid=="auto":
+        if to_num(ph)>to_num(max_ph):
+          small_pump1_acid="on"
+        else:
+          small_pump1_acid="off"
+
+
+
+    #small_pump2_base
+    if manual_small_pump2_base=="on" :
+      small_pump2_base="on"
+    elif manual_small_pump2_base=="off" :
+      small_pump2_base="off"
+    elif manual_small_pump2_base=="auto":
+        if to_num(ph)<to_num(min_ph):
+          small_pump2_base="on"
+        else:
+          small_pump2_base="off"
+       
+       
+    
+    #small_pump2_base
+    if manual_small_pump3_nutrient=="on" :
+      small_pump3_nutrient="on"
+    elif manual_small_pump3_nutrient=="off" :
+      small_pump3_nutrient="off" 
+    elif manual_small_pump3_nutrient=="auto":
+      if to_num(ph)<to_num(min_ph):
+        small_pump2_base="on"
+      else:
+        small_pump2_base="off"
+        
+        
+    if to_num(water_temperature)>to_num(max_water_temperature) or to_num(water_temperature)<to_num(min_water_temperature):
+      alarm_water_temperature="on"
+    else:
+      alarm_water_temperature="off"
+      
+    #================================================================
+       
+      
+      
+    #================================================================branch1
+    #branch1_light
+    if branch1_manual_light=="on" :
+      branch1_light="on"
+    elif branch1_manual_light=="off" :
+      branch1_light="off"
+    elif branch1_manual_light=="auto":
+      if to_num(branch1_light_intensity)<to_num(min_light_intensity):
+        branch1_light="on"
+      else:
+        branch1_light="off"
+    
+    #alarm_air_temperature 
+    if to_num(branch1_air_temperature)>to_num(max_air_temperature) or to_num(branch1_air_temperature)<to_num(min_air_temperature):
+      branch1_alarm_air_temperature="on"
+    else:
+      branch1_alarm_air_temperature="off"
+      
+    #================================================================
+    
+    #================================================================branch2
+    #branch2_light
+    if branch2_manual_light=="on" :
+      branch2_light="on"
+    elif branch2_manual_light=="off" :
+      branch2_light="off"
+    elif branch2_manual_light=="auto":
+      if to_num(branch2_light_intensity)<to_num(min_light_intensity):
+        branch2_light="on"
+      else:
+        branch2_light="off"
+    
+    #alarm_air_temperature 
+    if to_num(branch2_air_temperature)>to_num(max_air_temperature) or to_num(branch2_air_temperature)< to_num(min_air_temperature):
+      branch2_alarm_air_temperature="on"
+    else:
+      branch2_alarm_air_temperature="off"
+      
+    #================================================================
+
+    
+    
+    publish_mqtt("iot_vertical_farming_ppu2022/centric/big_pump1_water_flow",big_pump1_water_flow)
+    publish_mqtt("iot_vertical_farming_ppu2022/centric/small_pump1_acid",small_pump1_acid)
+    publish_mqtt("iot_vertical_farming_ppu2022/centric/small_pump2_base",small_pump2_base)
+    publish_mqtt("iot_vertical_farming_ppu2022/centric/small_pump3_nutrient",small_pump3_nutrient)
+    publish_mqtt("iot_vertical_farming_ppu2022/centric/alarm_water_temperature",alarm_water_temperature)
+    
+    publish_mqtt("iot_vertical_farming_ppu2022/branch1/light",branch1_light)
+    publish_mqtt("iot_vertical_farming_ppu2022/branch1/alarm_air_temperature",branch1_alarm_air_temperature)
+    
+    publish_mqtt("iot_vertical_farming_ppu2022/branch2/light",branch2_light)
+    publish_mqtt("iot_vertical_farming_ppu2022/branch2/alarm_air_temperature",branch2_alarm_air_temperature)
+    
+    
+    time.sleep(1*5)
+
+
+
+
+
+
+
+
+
+
+  
+t1 = threading.Thread(target=lambda :client.loop_forever(), args=())
+t1.start()
+
+run_processing()
+
+
+#convert byte to string and convert string to byte
+'''
+
+my_bytes = 'bobbyhadz.com'.encode('utf-8')
+print(my_bytes)  # 👉️ b'bobbyhadz.com'
+print(type(my_bytes))  # 👉️ <class 'bytes'>
+
+
+string = my_bytes.decode('utf-8')
+print(string)  # 👉️ bobbyhadz.com
+print(type(string))  # 👉️ <class 'str'>
+
+'''
+
+

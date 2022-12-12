@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./bootstrap/css/bootstrap.css" />
+
+    <title>MyFarm</title>
+    <script>
+      function connectToMqtt() {
+        client = new Paho.MQTT.Client(
+          "broker.hivemq.com",
+          Number(8000),
+          "clientId2"
+        );
+
+        // set callback handlers
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+
+        // connect the client
+        client.connect({ onSuccess: onConnect });
+
+        // called when the client connects
+        function onConnect() {
+          // Once a connection has been made, make a subscription and send a message.
+          console.log("Connected succefully");
+          client.subscribe("/World");
+          message = new Paho.MQTT.Message("Hello");
+          message.destinationName = "/World";
+          client.send(message);
+        }
+
+        // called when the client loses its connection
+        function onConnectionLost(responseObject) {
+          if (responseObject.errorCode !== 0) {
+            console.log("onConnectionLost:" + responseObject.errorMessage);
+          }
+        }
+
+        // called when a message arrives
+        function onMessageArrived(message) {
+          console.log("onMessageArrived:" + message.payloadString);
+        }
+      }
+      function sendMessage(message, topic) {
+        var message = new Paho.MQTT.Message(message);
+        message.destinationName = topic;
+        message.qos = 0;
+
+        client.send(message);
+      }
+
+      function takeAction(myradio) {
+        sendMessage(myradio.value, myradio.name);
+      }
+      function subscribe() {
+        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow");
+        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid");
+        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump2_base");
+        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient");
+        client.subscribe("iot_vertical_farming_ppu2022/centric/sensor_value");
+        client.subscribe("iot_vertical_farming_ppu2022/branch1/manual_light");
+        client.subscribe("iot_vertical_farming_ppu2022/branch1/sensor_value");
+        client.subscribe("iot_vertical_farming_ppu2022/branch2/manual_light");
+        client.subscribe("iot_vertical_farming_ppu2022/branch2/sensor_value");
+        client.subscribe("iot_vertical_farming_ppu2022/RPI/update_firebase_range_value");
+      }
+    </script>
+    <script src="./paho.javascript-1.0.3/paho-mqtt.js">
+    </script>
+  </head>
+  <body>
+    <p class="g">test test</p>
+    <script>
+      connectToMqtt();
+    </script>
+
+    <div class="control-container">
+      <button onclick="subscribe()">subscribe</button>
+      <div class="pump1">
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow"
+            id="flexRadioDefault1"
+            value="on"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault1"> on </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow"
+            value="off"
+            id="flexRadioDefault2"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault2"> off </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow"
+            id="flexRadioDefault3"
+            value="automate"
+            onclick="takeAction(this)"
+            checked
+          />
+          <label class="form-check-label" for="flexRadioDefault3">
+            automate
+          </label>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
