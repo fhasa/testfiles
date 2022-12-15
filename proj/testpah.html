@@ -5,80 +5,31 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="./bootstrap/css/bootstrap.css" />
-
     <title>MyFarm</title>
-    <script>
-      function connectToMqtt() {
-        client = new Paho.MQTT.Client(
-          "broker.hivemq.com",
-          Number(8000),
-          "clientId2"
-        );
-
-        // set callback handlers
-        client.onConnectionLost = onConnectionLost;
-        client.onMessageArrived = onMessageArrived;
-
-        // connect the client
-        client.connect({ onSuccess: onConnect });
-
-        // called when the client connects
-        function onConnect() {
-          // Once a connection has been made, make a subscription and send a message.
-          console.log("Connected succefully");
-          client.subscribe("/World");
-          message = new Paho.MQTT.Message("Hello");
-          message.destinationName = "/World";
-          client.send(message);
-        }
-
-        // called when the client loses its connection
-        function onConnectionLost(responseObject) {
-          if (responseObject.errorCode !== 0) {
-            console.log("onConnectionLost:" + responseObject.errorMessage);
-          }
-        }
-
-        // called when a message arrives
-        function onMessageArrived(message) {
-          console.log("onMessageArrived:" + message.payloadString);
-        }
-      }
-      function sendMessage(message, topic) {
-        var message = new Paho.MQTT.Message(message);
-        message.destinationName = topic;
-        message.qos = 0;
-
-        client.send(message);
-      }
-
-      function takeAction(myradio) {
-        sendMessage(myradio.value, myradio.name);
-      }
-      function subscribe() {
-        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_big_pump1_water_flow");
-        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid");
-        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump2_base");
-        client.subscribe("iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient");
-        client.subscribe("iot_vertical_farming_ppu2022/centric/sensor_value");
-        client.subscribe("iot_vertical_farming_ppu2022/branch1/manual_light");
-        client.subscribe("iot_vertical_farming_ppu2022/branch1/sensor_value");
-        client.subscribe("iot_vertical_farming_ppu2022/branch2/manual_light");
-        client.subscribe("iot_vertical_farming_ppu2022/branch2/sensor_value");
-        client.subscribe("iot_vertical_farming_ppu2022/RPI/update_firebase_range_value");
-      }
-    </script>
-    <script src="./paho.javascript-1.0.3/paho-mqtt.js">
-    </script>
+    <script src="mqts.js"></script>
+    <script src="./paho.javascript-1.0.3/paho-mqtt.js"></script>
   </head>
   <body>
     <p class="g">test test</p>
-    <script>
+ 
+   <script>
       connectToMqtt();
-    </script>
-
+    </script>     
+     
+     <div class="monitor-container">
+        <p id="ph">ph</p>
+        <p id="tds">tds</p>
+        <p id="water_temperature">water_temperature</p>
+        <p id="light_intensity">light_intensity</p>
+        <p id="air_humidity">air_humidity</p>
+        <p id="air_temperature">air_temperature</p>
+        <p id="light_intensity2">light_intensity2</p>
+        <p id="air_humidity2">air_humidity2</p>
+        <p id="air_temperature2">air_temperature2</p> 
+      </div>
     <div class="control-container">
-      <button onclick="subscribe()">subscribe</button>
+      <button onclick="subscribe()">test send to mqtt</button>
+      <h1 class="big-pump">Big pump control</h1>
       <div class="pump1">
         <div class="form-check">
           <input
@@ -117,6 +68,231 @@
           </label>
         </div>
       </div>
+      <div class="pump1-small-acid">
+        <h1 class="acid-small-pump">Acid small pump</h1>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid"
+            id="flexRadioDefault1"
+            value="on"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault1"> on </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid"
+            value="off"
+            id="flexRadioDefault2"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault2"> off </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump1_acid"
+            id="flexRadioDefault3"
+            value="automate"
+            onclick="takeAction(this)"
+            checked
+          />
+          <label class="form-check-label" for="flexRadioDefault3">
+            automate
+          </label>
+        </div>
+      </div>
+    
+    
+      <!--  base small pump control code  -->
+    
+      <div class="pump2-small-base">
+        <h1 class="base-small-pump">Base small pump</h1>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump2_base"
+            id="flexRadioDefault1"
+            value="on"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault1"> on </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump2_base"
+            value="off"
+            id="flexRadioDefault2"
+            onclick="takeAction(this)"
+          />
+          <label class="form-check-label" for="flexRadioDefault2"> off </label>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="radio"
+            name="iot_vertical_farming_ppu2022/centric/manual_small_pump2_base"
+            id="flexRadioDefault3"
+            value="automate"
+            onclick="takeAction(this)"
+            checked
+          />
+          <label class="form-check-label" for="flexRadioDefault3">
+            automate
+          </label>
+        </div>
+      </div>
+
+      <!-- end of base small pump control code  -->
+    <!-- nutrient pump control code  -->
+    
+    <div class="pump3-small-nutrient">
+      <h1 class="nutrient-small-pump">Nutrient small pump</h1>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="radio"
+          name="iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient"
+          id="flexRadioDefault1"
+          value="on"
+          onclick="takeAction(this)"
+        />
+        <label class="form-check-label" for="flexRadioDefault1"> on </label>
+      </div>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="radio"
+          name="iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient"
+          value="off"
+          id="flexRadioDefault2"
+          onclick="takeAction(this)"
+        />
+        <label class="form-check-label" for="flexRadioDefault2"> off </label>
+      </div>
+      <div class="form-check">
+        <input
+          class="form-check-input"
+          type="radio"
+          name="iot_vertical_farming_ppu2022/centric/manual_small_pump3_nutrient"
+          id="flexRadioDefault3"
+          value="automate"
+          onclick="takeAction(this)"
+          checked
+        />
+        <label class="form-check-label" for="flexRadioDefault3">
+          automate
+        </label>
+      </div>
+    </div>
+  <!-- end of nutrient pump control code  -->
+ 
+  <!--  light branch 1 control code  -->
+  <div class="light-1">
+    <h1 class="light-1">Light branch-1</h1>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch1/manual_light"
+        id="flexRadioDefault1"
+        value="on"
+        onclick="takeAction(this)"
+      />
+      <label class="form-check-label" for="flexRadioDefault1"> on </label>
+    </div>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch1/manual_light"
+        value="off"
+        id="flexRadioDefault2"
+        onclick="takeAction(this)"
+      />
+      <label class="form-check-label" for="flexRadioDefault2"> off </label>
+    </div>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch1/manual_light"
+        id="flexRadioDefault3"
+        value="automate"
+        onclick="takeAction(this)"
+        checked
+      />
+      <label class="form-check-label" for="flexRadioDefault3">
+        automate
+      </label>
+    </div>
+  </div>
+  <!-- end of light branch 1 control code  -->
+    
+  
+  <!--  light branch 2 control code  -->
+  <div class="light-2">
+    <h1 class="light-2">Light branch-2</h1>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch2/manual_light"
+        id="flexRadioDefault1"
+        value="on"
+        onclick="takeAction(this)"
+      />
+      <label class="form-check-label" for="flexRadioDefault1"> on </label>
+    </div>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch2/manual_light"
+        value="off"
+        id="flexRadioDefault2"
+        onclick="takeAction(this)"
+      />
+      <label class="form-check-label" for="flexRadioDefault2"> off </label>
+    </div>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="radio"
+        name="iot_vertical_farming_ppu2022/branch2/manual_light"
+        id="flexRadioDefault3"
+        value="automate"
+        onclick="takeAction(this)"
+        checked
+      />
+      <label class="form-check-label" for="flexRadioDefault3">
+        automate
+      </label>
+    </div>
+  </div>
+
+  <!-- end of light branch 2 control code  -->
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     </div>
   </body>
 </html>
