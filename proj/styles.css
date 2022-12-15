@@ -1,0 +1,20 @@
+body{
+    padding: 30px;
+}
+#flexRadioDefault1{
+    color: green;
+}
+.val-cont{
+    width: 300px;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    background-color: #ffffb3;
+    padding: 10px;
+}
+label{
+font-weight: 400;
+color: green;
+font-size: 25;
+}
